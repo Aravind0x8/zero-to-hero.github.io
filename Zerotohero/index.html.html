@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Zerotohero — Bug Bounty Tracker</title>
+  <style>
+    /*
+      Zerotohero single-file styles
+      - theme variables ensure readable text and logo in light/dark
+      - subtle glass & shadow design
+      - hover tooltips and inputs styled
+    */
+    :root{
+      --bg1: #0f1724;
+      --bg2: #071026;
+      --card: #071127;
+      --muted: #9aa4b2;
+      --accent: #7c3aed;
+      --accent-2: #06b6d4;
+      --text: #e6eef8;
+      --glass: rgba(255,255,255,0.04);
+      --logo-bg: linear-gradient(135deg,#7c3aed,#06b6d4);
+      --logo-text: #fff;
+      --shadow: 0 8px 30px rgba(2,6,23,0.6);
+      --border: rgba(255,255,255,0.04);
+    }
+    [data-theme="light"]{
+      --bg1: #f6f8fb;
+      --bg2: #ffffff;
+      --card: #ffffff;
+      --muted: #4b5563;
+      --accent: #6d28d9;
+      --accent-2: #0891b2;
+      --text: #0b1220;
+      --glass: rgba(0,0,0,0.04);
+      --logo-bg: linear-gradient(135deg,#7c3aed,#06b6d4);
+      --logo-text: #ffffff;
+      --shadow: 0 10px 30px rgba(2,6,23,0.06);
+      --border: rgba(11,17,32,0.06);
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,var(--bg1),var(--bg2));
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      line-height:1.4;
+      min-height:100vh;
+      padding:28px 18px;
+    }
+
+    .container{max-width:1100px;margin:0 auto}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .brand{display:flex;align-items:center;gap:12px}
+    .logo{
+      width:56px;height:56px;border-radius:999px;display:flex;align-items:center;justify-content:center;
+      background:var(--logo-bg);box-shadow:0 6px 20px rgba(12,12,20,0.3), inset 0 -6px 20px rgba(255,255,255,0.03);
+      color:var(--logo-text);font-weight:800;font-size:20px;letter-spacing:0.6px;
+      border:2px solid rgba(255,255,255,0.04);transition:transform .18s ease, box-shadow .18s ease;
+    }
+    .logo:hover{transform:translateY(-3px) scale(1.02);box-shadow:0 12px 40px rgba(12,12,20,0.5)}
+    h1{margin:0;font-size:22px}
+    p.lead{margin:0;color:var(--muted);font-size:13px}
+
+    .controls{display:flex;gap:10px;align-items:center}
+    .btn{appearance:none;border:0;padding:8px 12px;border-radius:10px;background:var(--accent);color:white;cursor:pointer;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,0.12)}
+    .btn.ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+    .muted-btn{background:transparent;border:1px solid var(--border);padding:8px 10px;border-radius:8px;color:var(--muted);cursor:pointer}
+    .muted-btn:hover{box-shadow:var(--shadow)}
+
+    main{margin-top:18px;display:grid;grid-template-columns:1fr 2fr;gap:14px}
+    .card{background:var(--card);padding:14px;border-radius:14px;box-shadow:var(--shadow);border:1px solid var(--border)}
+    table{width:100%;border-collapse:collapse}
+    thead th{font-size:12px;color:var(--muted);text-align:left;padding:8px;border-bottom:1px dashed var(--border)}
+    td, th{padding:8px;font-size:13px;vertical-align:middle}
+    tbody tr{border-bottom:1px solid rgba(255,255,255,0.02)}
+    .muted{color:var(--muted)}
+    .small{font-size:12px}
+    .tag{display:inline-block;padding:6px 8px;border-radius:999px;background:var(--glass);font-size:12px;margin:2px;color:var(--text)}
+
+    /* modal */
+    .modal-back{position:fixed;inset:0;background:rgba(2,6,23,0.5);display:flex;align-items:center;justify-content:center;z-index:60}
+    .modal{width:100%;max-width:920px}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    input[type=text], input[type=datetime-local], select, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text);outline:none}
+    input[type=text]:focus, select:focus, textarea:focus{box-shadow:0 8px 24px rgba(0,0,0,0.08);border-color:var(--accent)}
+    .grid{display:grid;gap:10px}
+    .grid.cols-2{grid-template-columns:1fr 1fr}
+    .heat-grid{display:flex;gap:10px;flex-wrap:wrap}
+    .heat-month{background:transparent;padding:8px;border-radius:8px;min-width:120px}
+    .day{width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:10px;border-radius:4px}
+    .fire-0{opacity:0.12}
+    .fire-1{opacity:0.5}
+    .fire-2{opacity:0.8}
+    .fire-3{opacity:1}
+    footer{text-align:center;margin-top:18px;color:var(--muted);font-size:13px}
+
+    /* tooltip hover */
+    .tooltip{position:relative;display:inline-block}
+    .tooltip .tooltip-card{position:absolute;right:0;top:120%;opacity:0;transform:translateY(8px);transition:all .18s ease;pointer-events:none;background:var(--card);padding:12px;border-radius:10px;min-width:260px;border:1px solid var(--border);box-shadow:var(--shadow)}
+    .tooltip:hover .tooltip-card{opacity:1;transform:translateY(0);pointer-events:auto}
+
+    /* responsive */
+    @media (max-width:920px){
+      main{grid-template-columns:1fr;align-items:stretch}
+      .logo{width:48px;height:48px;font-size:18px}
+    }
+
+    /* subtle UI micro-interactions */
+    button:active{transform:translateY(1px)}
+    .action-group button{margin-left:6px}
+  </style>
+</head>
+<body data-theme="dark">
+  <div class="container">
+    <header>
+      <div class="brand">
+        <!-- Circular logo (ZH) -->
+        <div id="logo" class="logo" title="Zerotohero — ZH"></div>
+        <div>
+          <h1>Zerotohero</h1>
+          <p class="lead">Track bugs, streaks & bounty progress</p>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="tooltip">
+          <button id="descBtn" class="muted-btn">About</button>
+          <div class="tooltip-card">
+            <strong>Welcome to Zerotohero</strong>
+            <p class="muted small" style="margin:6px 0 0 0">
+              Welcome to Zerotohero, your dedicated platform for bug bounty success. Document findings, track progress, and celebrate streaks.
+            </p>
+          </div>
+        </div>
+
+        <button id="themeToggle" class="muted-btn" title="Toggle theme">Switch Theme</button>
+        <button id="addBtn" class="btn">Create Report</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Left column -->
+      <section class="card">
+        <h3 style="margin:0 0 8px 0">Quarterly Summary</h3>
+        <table aria-label="Quarterly summary">
+          <thead>
+            <tr><th>Quarter</th><th>Bugs Submitted</th></tr>
+          </thead>
+          <tbody id="quarterTable">
+            <tr><td>Q1 (Jan - Mar)</td><td id="q1">0</td></tr>
+            <tr><td>Q2 (Apr - Jun)</td><td id="q2">0</td></tr>
+            <tr><td>Q3 (Jul - Sep)</td><td id="q3">0</td></tr>
+            <tr><td>Q4 (Oct - Dec)</td><td id="q4">0</td></tr>
+          </tbody>
+        </table>
+
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+          <button id="importBtn" class="muted-btn">Import JSON</button>
+          <input id="fileInput" type="file" accept="application/json" style="display:none" />
+          <button id="exportJson" class="muted-btn">Download JSON</button>
+          <button id="exportDoc" class="muted-btn">Download DOC</button>
+          <button id="exportPdf" class="muted-btn">Download PDF</button>
+          <button id="exportZip" class="muted-btn">Download ZIP</button>
+        </div>
+
+        <div style="margin-top:10px;color:var(--muted);font-size:13px">Note: import accepts JSON array, `{ "reports":[...] }` or a single report object.</div>
+      </section>
+
+      <!-- Right column -->
+      <section class="card" style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <h3 style="margin:0">Bug Reports <span id="totalCount" class="muted small">(0)</span></h3>
+            <div class="muted small">Manage, edit and export individual reports</div>
+          </div>
+
+          <div style="display:flex;gap:8px;align-items:center">
+            <label class="small muted">Heatmap year</label>
+            <select id="heatYear" style="padding:8px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text)"></select>
+          </div>
+        </div>
+
+        <div style="overflow:auto;max-height:360px;border-radius:8px;padding:4px;background:linear-gradient(180deg,transparent,rgba(0,0,0,0.02))">
+          <table id="reportsTable" aria-label="Reports table">
+            <thead>
+              <tr>
+                <th>Name</th><th>Reported To</th><th>Reported At</th><th>Tags</th><th>Rewards</th><th>Timeline</th><th>Result</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="reportsBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- Heatmap section -->
+    <section style="margin-top:14px" class="card">
+      <h3 style="margin:0 0 8px 0">Year Heatmap</h3>
+      <div id="heatmap" class="heat-grid" aria-hidden="false"></div>
+    </section>
+
+    <footer>Created and Designed by Aravindx08</footer>
+  </div>
+
+  <!-- modal root -->
+  <div id="modalRoot"></div>
+
+  <script>
+    /* Zerotohero single-file JS
+       - Local persistence via localStorage
+       - Add/Edit/Delete reports
+       - Exports: JSON, DOC (HTML doc), PDF (print window), ZIP (single JSON)
+       - Import robustly handles different JSON shapes
+       - Theme toggle with accessible contrast & logo handling
+    */
+
+    const STORAGE_KEY = 'zerotohero_reports_v3';
+    let reports = [];
+
+    // initial theme: check system or fallback to dark
+    const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme:light)').matches;
+    let currentTheme = prefersLight ? 'light' : 'dark';
+    document.body.setAttribute('data-theme', currentTheme);
+
+    // DOM refs
+    const q1El = document.getElementById('q1'), q2El = document.getElementById('q2'), q3El = document.getElementById('q3'), q4El = document.getElementById('q4');
+    const reportsBody = document.getElementById('reportsBody'), totalCount = document.getElementById('totalCount');
+    const heatmapEl = document.getElementById('heatmap'), heatYearSel = document.getElementById('heatYear');
+    const fileInput = document.getElementById('fileInput');
+
+    // OWASP tags
+    const OWASP_TAGS = [
+      "A01-Broken Access Control","A02-Cryptographic Failures","A03-Injection",
+      "A04-Insecure Design","A05-Security Misconfiguration","A06-Vulnerable and Outdated Components",
+      "A07-Identification and Authentication Failures","A08-Software and Data Integrity Failures",
+      "A09-Security Logging and Monitoring Failures","A10-Server-Side Request Forgery (SSRF)"
+    ];
+
+    // boot
+    document.addEventListener('DOMContentLoaded', ()=>{
+      load();
+      populateHeatYear();
+      renderAll();
+      attachEvents();
+      renderLogo();
+    });
+
+    function attachEvents(){
+      document.getElementById('addBtn').addEventListener('click', ()=>openForm());
+      document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+      document.getElementById('exportJson').addEventListener('click', exportJSON);
+      document.getElementById('exportDoc').addEventListener('click', exportDOC);
+      document.getElementById('exportPdf').addEventListener('click', exportPDF);
+      document.getElementById('exportZip').addEventListener('click', exportZIP);
+      document.getElementById('importBtn').addEventListener('click', ()=>fileInput.click());
+      fileInput.addEventListener('change', handleImportFile);
+      heatYearSel.addEventListener('change', renderHeatmap);
+    }
+
+    function renderLogo(){
+      const logo = document.getElementById('logo');
+      // create gradient circle with "ZH"
+      logo.innerHTML = '';
+      const span = document.createElement('span');
+      span.textContent = 'ZH';
+      span.style.fontFamily = 'Inter, system-ui, sans-serif';
+      span.style.fontWeight = '800';
+      span.style.fontSize = '18px';
+      span.style.color = getComputedStyle(document.body).getPropertyValue('--logo-text') || '#fff';
+      logo.appendChild(span);
+      // adapt background for light theme so logo remains visible
+      if(document.body.getAttribute('data-theme') === 'light'){
+        logo.style.background = 'linear-gradient(135deg,#7c3aed,#06b6d4)';
+        logo.style.color = '#fff';
+      } else {
+        logo.style.background = 'linear-gradient(135deg,#7c3aed,#06b6d4)';
+        logo.style.color = '#fff';
+      }
+    }
+
+    function toggleTheme(){
+      currentTheme = document.body.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      document.body.setAttribute('data-theme', currentTheme);
+      // update some accessible text colors if needed (handled by CSS variables)
+      renderLogo();
+    }
+
+    // persistence
+    function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(reports)); }
+    function load(){
+      try{
+        const raw = localStorage.getItem(STORAGE_KEY);
+        reports = raw ? JSON.parse(raw) : [];
+      }catch(e){
+        reports = [];
+        console.warn('Failed to load reports', e);
+      }
+    }
+
+    // rendering
+    function renderAll(){
+      renderQuarter();
+      renderReportsTable();
+      renderHeatmap();
+      totalCount.textContent = `(${reports.length})`;
+    }
+
+    function renderQuarter(){
+      const q = {Q1:0,Q2:0,Q3:0,Q4:0};
+      reports.forEach(r=>{
+        const d = new Date(r.datetime);
+        const m = d.getMonth();
+        if(m<=2) q.Q1++; else if(m<=5) q.Q2++; else if(m<=8) q.Q3++; else q.Q4++;
+      });
+      q1El.textContent = q.Q1; q2El.textContent = q.Q2; q3El.textContent = q.Q3; q4El.textContent = q.Q4;
+    }
+
+    function renderReportsTable(){
+      reportsBody.innerHTML = '';
+      if(reports.length === 0){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="8" class="muted">No reports yet — click "Create Report" to start.</td>`;
+        reportsBody.appendChild(tr);
+        return;
+      }
+      reports.forEach(r=>{
+        const tr = document.createElement('tr');
+        const tagsHtml = (r.tags||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('');
+        const timeline = r.timelineDays===null || r.timelineDays===undefined ? 'Open' : r.timelineDays;
+        tr.innerHTML = `
+          <td>${escapeHtml(r.name)}</td>
+          <td>${escapeHtml(r.reportedTo)}</td>
+          <td>${formatLocal(r.datetime)}</td>
+          <td>${tagsHtml}</td>
+          <td>${escapeHtml(r.rewards||'-')}</td>
+          <td>${timeline}</td>
+          <td>${escapeHtml(r.result)}</td>
+          <td class="action-group">
+            <button class="muted-btn" onclick="exportSingle('${r.id}')">Export</button>
+            <button class="muted-btn" onclick="openForm('${r.id}')">Edit</button>
+            <button class="muted-btn" onclick="deleteReport('${r.id}')">Delete</button>
+          </td>
+        `;
+        reportsBody.appendChild(tr);
+      });
+    }
+
+    // heatmap helpers
+    function populateHeatYear(){
+      const sel = heatYearSel;
+      const now = new Date().getFullYear();
+      sel.innerHTML = '';
+      for(let y = now+1; y >= now-5; y--){
+        const opt = document.createElement('option'); opt.value = y; opt.textContent = y; sel.appendChild(opt);
+      }
+      sel.value = now;
+    }
+
+    function renderHeatmap(){
+      heatmapEl.innerHTML = '';
+      const year = parseInt(heatYearSel.value, 10);
+      const byDate = {};
+      reports.forEach(r=>{
+        const d = new Date(r.datetime);
+        if(d.getFullYear() !== year) return;
+        const key = d.toISOString().slice(0,10);
+        byDate[key] = (byDate[key] || 0) + 1;
+      });
+
+      for(let m=0;m<12;m++){
+        const monthDiv = document.createElement('div');
+        monthDiv.className = 'heat-month';
+        const monthName = new Date(year,m,1).toLocaleString(undefined,{month:'short'});
+        monthDiv.innerHTML = `<div class="small muted">${monthName}</div>`;
+        const daysDiv = document.createElement('div');
+        daysDiv.style.display = 'grid';
+        daysDiv.style.gridTemplateColumns = 'repeat(7,18px)';
+        daysDiv.style.gap = '6px';
+        daysDiv.style.marginTop = '8px';
+        const dim = new Date(year,m+1,0).getDate();
+        for(let d=1; d<=dim; d++){
+          const key = new Date(year,m,d).toISOString().slice(0,10);
+          const c = byDate[key] || 0;
+          const el = document.createElement('div');
+          el.className = 'day';
+          if(c === 0){ el.textContent = '•'; el.classList.add('fire-0'); }
+          else if(c === 1){ el.textContent = '🔥'; el.classList.add('fire-1'); }
+          else if(c <= 3){ el.textContent = '🔥'; el.classList.add('fire-2'); }
+          else { el.textContent = '🔥'; el.classList.add('fire-3'); }
+          el.title = `${key}: ${c} report(s)`;
+          daysDiv.appendChild(el);
+        }
+        monthDiv.appendChild(daysDiv);
+        heatmapEl.appendChild(monthDiv);
+      }
+    }
+
+    // Form (create & edit) - built dynamically
+    function openForm(editId){
+      const modalRoot = document.getElementById('modalRoot');
+      const isEdit = !!editId;
+      const data = isEdit ? reports.find(r=>r.id === editId) : null;
+
+      modalRoot.innerHTML = `
+        <div class="modal-back">
+          <div class="modal card" role="dialog" aria-modal="true">
+            <form id="reportForm">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <h3 style="margin:0">${isEdit ? 'Edit Report' : 'New Bug Report'}</h3>
+                <div><button type="button" id="closeModal" class="muted-btn">Close</button></div>
+              </div>
+
+              <div class="grid cols-2">
+                <div>
+                  <label>Vulnerability Name</label>
+                  <input id="f_name" type="text" value="${data ? escapeAttr(data.name) : ''}" required />
+                </div>
+                <div>
+                  <label>Reported To</label>
+                  <input id="f_reportedTo" type="text" value="${data ? escapeAttr(data.reportedTo) : ''}" required />
+                </div>
+
+                <div>
+                  <label>Reporting Date & Time (manual)</label>
+                  <input id="f_datetime" type="text" placeholder="YYYY-MM-DDTHH:MM" value="${data ? formatIsoForInput(data.datetime) : new Date().toISOString().slice(0,16)}" />
+                  <div class="small muted" style="margin-top:6px">Format: <code>YYYY-MM-DDTHH:MM</code>. <button type="button" onclick="fillNow('f_datetime')" class="muted-btn">Now</button></div>
+                </div>
+
+                <div>
+                  <label>Resolved Date & Time (optional)</label>
+                  <input id="f_resolved" type="text" placeholder="YYYY-MM-DDTHH:MM" value="${data && data.resolvedDatetime ? formatIsoForInput(data.resolvedDatetime) : ''}" />
+                </div>
+
+                <div style="grid-column:1/3">
+                  <label>Tags (OWASP)</label>
+                  <div id="tagsContainer" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px"></div>
+                </div>
+
+                <div>
+                  <label>Rewards</label>
+                  <input id="f_rewards" type="text" value="${data ? escapeAttr(data.rewards) : ''}" placeholder="e.g. $500" />
+                </div>
+
+                <div>
+                  <label>Result</label>
+                  <select id="f_result">
+                    <option ${data && data.result === 'Pending' ? 'selected' : ''}>Pending</option>
+                    <option ${data && data.result === 'Triaged' ? 'selected' : ''}>Triaged</option>
+                    <option ${data && data.result === 'Resolved' ? 'selected' : ''}>Resolved</option>
+                    <option ${data && data.result === 'Not Applicable' ? 'selected' : ''}>Not Applicable</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+                <button type="button" id="cancelBtn" class="muted-btn">Cancel</button>
+                <button type="submit" class="btn">${isEdit ? 'Save Changes' : 'Create Report'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      `;
+
+      // fill tags
+      const tagsContainer = document.getElementById('tagsContainer');
+      OWASP_TAGS.forEach(t=>{
+        const chk = document.createElement('label');
+        chk.style.fontSize = '13px';
+        const checked = data && data.tags && data.tags.includes(t) ? 'checked' : '';
+        chk.innerHTML = `<input type="checkbox" name="f_tags" value="${escapeAttr(t)}" ${checked} /> ${escapeHtml(t)}`;
+        tagsContainer.appendChild(chk);
+      });
+
+      document.getElementById('closeModal').addEventListener('click', closeForm);
+      document.getElementById('cancelBtn').addEventListener('click', closeForm);
+      document.getElementById('reportForm').addEventListener('submit', function(e){
+        e.preventDefault();
+        const obj = collectForm();
+        if(isEdit){ obj.id = editId; updateReport(obj); }
+        else createReport(obj);
+        closeForm();
+      });
+    }
+
+    function closeForm(){
+      const root = document.getElementById('modalRoot'); root.innerHTML = '';
+    }
+
+    function fillNow(fieldId){
+      const d = new Date(); const iso = d.toISOString().slice(0,16);
+      const el = document.getElementById(fieldId);
+      if(el) el.value = iso;
+    }
+
+    function collectForm(){
+      const name = document.getElementById('f_name').value.trim();
+      const reportedTo = document.getElementById('f_reportedTo').value.trim();
+      const datetime = document.getElementById('f_datetime').value.trim();
+      const resolved = document.getElementById('f_resolved').value.trim();
+      const rewards = document.getElementById('f_rewards').value.trim();
+      const result = document.getElementById('f_result').value;
+      const tags = Array.from(document.querySelectorAll('input[name="f_tags"]:checked')).map(i=>i.value);
+      const dt = normalizeIso(datetime);
+      const rd = resolved ? normalizeIso(resolved) : null;
+      const timeline = rd ? Math.ceil((new Date(rd) - new Date(dt)) / (1000*60*60*24)) : null;
+      return { name, reportedTo, datetime: dt, resolvedDatetime: rd, tags, rewards, timelineDays: timeline, result };
+    }
+
+    function normalizeIso(s){
+      if(!s) return new Date().toISOString();
+      if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s)) return new Date(s).toISOString();
+      const parsed = Date.parse(s);
+      if(!isNaN(parsed)) return new Date(parsed).toISOString();
+      return new Date().toISOString();
+    }
+
+    function createReport(obj){ obj.id = String(Date.now()); reports.unshift(obj); save(); renderAll(); }
+    function updateReport(obj){ const idx = reports.findIndex(r=>r.id===obj.id); if(idx>=0){ reports[idx] = obj; save(); renderAll(); } }
+    function deleteReport(id){ if(!confirm('Delete this report permanently?')) return; reports = reports.filter(r=>r.id !== id); save(); renderAll(); }
+
+    // exports
+    function exportJSON(){
+      const data = JSON.stringify({ exportedAt: new Date().toISOString(), reports }, null, 2);
+      downloadBlob(data, 'zerotohero_reports.json','application/json');
+    }
+    function exportDOC(){
+      let html = `<html><head><meta charset='utf-8'><title>Zerotohero</title></head><body><h1>Zerotohero Reports</h1><div>Total: ${reports.length}</div>`;
+      reports.forEach(r=>{
+        html += `<h3>${escapeHtml(r.name)}</h3><div>Reported to: ${escapeHtml(r.reportedTo)}</div><div>At: ${escapeHtml(formatLocal(r.datetime))}</div><div>Tags: ${escapeHtml((r.tags||[]).join(', '))}</div><div>Rewards: ${escapeHtml(r.rewards||'-')}</div><div>Result: ${escapeHtml(r.result)}</div><hr/>`;
+      });
+      html += `</body></html>`;
+      downloadBlob(html, 'zerotohero_reports.doc','application/msword');
+    }
+    function exportPDF(){
+      const w = window.open('','_blank');
+      w.document.write(`<html><head><meta charset="utf-8"><title>Zerotohero Reports</title></head><body>`);
+      w.document.write(`<h1>Zerotohero Reports</h1><div>Total: ${reports.length}</div>`);
+      reports.forEach(r=>{
+        w.document.write(`<h3>${escapeHtml(r.name)}</h3><div>Reported to: ${escapeHtml(r.reportedTo)}</div><div>At: ${escapeHtml(formatLocal(r.datetime))}</div><div>Tags: ${escapeHtml((r.tags||[]).join(', '))}</div><div>Rewards: ${escapeHtml(r.rewards||'-')}</div><div>Result: ${escapeHtml(r.result)}</div><hr/>`);
+      });
+      w.document.write('</body></html>');
+      w.document.close(); w.focus();
+      setTimeout(()=>{ try{ w.print(); }catch(e){} },400);
+    }
+
+    // tiny ZIP builder for single-file JSON
+    function exportZIP(){
+      const filename = 'zerotohero_reports.zip';
+      const json = JSON.stringify({ exportedAt:new Date().toISOString(), reports }, null, 2);
+      const encoder = new TextEncoder(); const fileData = encoder.encode(json);
+      // local header (minimal)
+      function crc32(buf){
+        const table = (function(){let t=[]; for(let i=0;i<256;i++){let c=i; for(let k=0;k<8;k++) c=(c&1)? 0xedb88320 ^ (c>>>1) : c>>>1; t[i]=c;} return t; })();
+        let crc = 0 ^ (-1);
+        for(let i=0;i<buf.length;i++){ crc = (crc >>> 8) ^ table[(crc ^ buf[i]) & 0xff]; }
+        return (crc ^ (-1)) >>> 0;
+      }
+      const name = 'zerotohero_reports.json';
+      const nameBuf = encoder.encode(name);
+      const localHeader = new Uint8Array(30 + nameBuf.length);
+      const dv = new DataView(localHeader.buffer);
+      let p=0;
+      dv.setUint32(p,0x04034b50,true); p+=4;
+      dv.setUint16(p,20,true); p+=2; dv.setUint16(p,0,true); p+=2; dv.setUint16(p,0,true); p+=2;
+      dv.setUint16(p,0,true); p+=2; dv.setUint16(p,0,true); p+=2;
+      const crc = crc32(fileData);
+      dv.setUint32(p,crc,true); p+=4;
+      dv.setUint32(p,fileData.length,true); p+=4;
+      dv.setUint32(p,fileData.length,true); p+=4;
+      dv.setUint16(p,nameBuf.length,true); p+=2; dv.setUint16(p,0,true); p+=2;
+      localHeader.set(nameBuf,p);
+      // central directory (very minimal, offsets are approximate — works in many clients)
+      const central = new Uint8Array(46 + nameBuf.length);
+      const cd = new DataView(central.buffer);
+      p=0; cd.setUint32(p,0x02014b50,true); p+=4; cd.setUint16(p,0x033f,true); p+=2; cd.setUint16(p,20,true); p+=2;
+      cd.setUint16(p,0,true); p+=2; cd.setUint16(p,0,true); p+=2; cd.setUint16(p,0,true); p+=2; cd.setUint16(p,0,true); p+=2;
+      cd.setUint32(p,crc,true); p+=4; cd.setUint32(p,fileData.length,true); p+=4; cd.setUint32(p,fileData.length,true); p+=4;
+      cd.setUint16(p,nameBuf.length,true); p+=2; cd.setUint16(p,0,true); p+=2; cd.setUint16(p,0,true); p+=2; cd.setUint16(p,0,true); p+=2; cd.setUint16(p,0,true); p+=2;
+      cd.setUint32(p,0,true); p+=4; cd.setUint32(p,0,true); p+=4; central.set(nameBuf,p); p+=nameBuf.length;
+      const end = new Uint8Array(22); const ed = new DataView(end.buffer);
+      p=0; ed.setUint32(p,0x06054b50,true); p+=4; ed.setUint16(p,0,true); p+=2; ed.setUint16(p,0,true); p+=2; ed.setUint16(p,1,true); p+=2; ed.setUint16(p,1,true); p+=2;
+      ed.setUint32(p,central.length,true); p+=4; ed.setUint32(p,localHeader.length + fileData.length,true); p+=4; ed.setUint16(p,0,true); p+=2;
+      const blob = new Blob([localHeader, fileData, central, end], {type:'application/zip'});
+      downloadBlob(blob, filename, 'application/zip');
+    }
+
+    // helpers for exports/import
+    function downloadBlob(content, filename, mime){
+      const blob = content instanceof Blob ? content : new Blob([content], {type: mime});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+    function exportSingle(id){
+      const r = reports.find(x=>x.id===id); if(!r) return;
+      const data = JSON.stringify(r, null, 2);
+      downloadBlob(data, `report_${id}.json`, 'application/json');
+    }
+
+    // robust import
+    function handleImportFile(e){
+      const f = e.target.files[0]; if(!f) return;
+      const reader = new FileReader();
+      reader.onload = (ev)=>{
+        try{
+          const obj = JSON.parse(ev.target.result);
+          let incoming = [];
+          if(Array.isArray(obj)) incoming = obj;
+          else if(obj && Array.isArray(obj.reports)) incoming = obj.reports;
+          else if(obj && typeof obj === 'object') incoming = [obj];
+          else throw new Error('Unrecognized JSON structure');
+
+          const fixed = incoming.map((r,i)=>({
+            id: r.id || String(Date.now()+i),
+            name: r.name || 'Untitled',
+            reportedTo: r.reportedTo || '',
+            datetime: r.datetime || new Date().toISOString(),
+            resolvedDatetime: r.resolvedDatetime || null,
+            tags: Array.isArray(r.tags) ? r.tags : (r.tags ? [String(r.tags)] : []),
+            rewards: r.rewards || '',
+            timelineDays: r.timelineDays !== undefined ? r.timelineDays : (r.resolvedDatetime ? Math.ceil((new Date(r.resolvedDatetime) - new Date(r.datetime)) / (1000*60*60*24)) : null),
+            result: r.result || 'Pending'
+          }));
+          // prepend
+          reports = [...fixed, ...reports];
+          save(); renderAll();
+          alert(`Imported ${fixed.length} report(s)`);
+        }catch(err){
+          alert('Import failed: ' + (err.message || err));
+        }
+      };
+      reader.readAsText(f);
+      // reset
+      e.target.value = '';
+    }
+
+    // utility
+    function formatLocal(iso){ if(!iso) return '-'; const d = new Date(iso); return d.toLocaleString(); }
+    function formatIsoForInput(iso){ if(!iso) return ''; return iso.slice(0,16); }
+    function escapeHtml(s){ if(s===undefined || s===null) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function escapeAttr(s){ return escapeHtml(s).replace(/"/g, '&quot;'); }
+
+    // expose some functions to global scope for inline handlers
+    window.openForm = openForm;
+    window.deleteReport = deleteReport;
+    window.exportSingle = exportSingle;
+    window.fillNow = fillNow;
+
+  </script>
+</body>
+</html>
